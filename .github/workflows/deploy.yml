@@ -2,7 +2,9 @@ name: Deploy Calnow to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - claude/diabetes-health-tracker-pwa-5numt3
   workflow_dispatch:
 
 permissions:

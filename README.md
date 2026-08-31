@@ -67,9 +67,13 @@ npm run icons      # regenerate PWA icons from the logo source
 
 ## Deploying
 
-Pushing to `main` builds and publishes to GitHub Pages via
-`.github/workflows/deploy.yml`. Enable it once under **Settings → Pages →
-Source: GitHub Actions**.
+**Set the Pages source to GitHub Actions once**, under
+**Settings → Pages → Build and deployment → Source**. If it is left on
+*Deploy from a branch*, GitHub serves the repo root — which is the un-built
+Vite source — and the page loads blank.
+
+After that, every push to `main` or the active working branch builds and
+publishes via `.github/workflows/deploy.yml`.
 
 The build assumes the app is served from `/calnow/`. For a root domain
 (Netlify, Vercel, a custom domain) build with `BASE_PATH=/ npm run build`.
