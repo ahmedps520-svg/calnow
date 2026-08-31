@@ -6,22 +6,40 @@ import { useStore } from './lib/store';
 import { Doctor } from './pages/Doctor';
 import { History } from './pages/History';
 import { Insights } from './pages/Insights';
-import { Lock } from './pages/Lock';
+import { Lock, PinGate } from './pages/Lock';
 import { Onboarding } from './pages/Onboarding';
 import { Settings } from './pages/Settings';
+import { SignIn } from './pages/SignIn';
 import { Today } from './pages/Today';
 import { TodaySon } from './pages/TodaySon';
 
 type Tab = 'today' | 'insights' | 'history' | 'settings';
 
+/** Shown when the build has no Supabase key baked in. */
+function Setup() {
+  return (
+    <div className="picker">
+      <div className="col" style={{ alignItems: 'center', gap: 12 }}>
+        <Logo size={58} />
+        <h1 className="display" style={{ fontSize: 26 }}>One step left</h1>
+        <p className="muted center">
+          This build has no Supabase key, so Calnow cannot reach the cloud yet. Add the project&rsquo;s
+          <b> anon public </b> key to <code>src/lib/config.ts</code> and deploy again.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function App() {
-  const { ready, profile, onboarded, setActive, t } = useStore();
+  const {
+    ready, configured, session, profile, activeId, locked, onboarded, online, cloudError, busy, reload, t,
+  } = useStore();
   const [tab, setTab] = useState<Tab>('today');
   const [logOpen, setLogOpen] = useState(false);
   const [intent, setIntent] = useState<LogIntent | undefined>();
   const [doctorFor, setDoctorFor] = useState<string | null>(null);
 
-  /* a new view always starts at the top */
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [tab, doctorFor, profile?.id]);
@@ -31,21 +49,26 @@ export function App() {
     setLogOpen(true);
   };
 
+  if (!configured) return <Setup />;
+
   if (!ready) {
     return (
       <div className="picker" style={{ alignItems: 'center', justifyContent: 'center' }}>
         <Logo size={56} />
+        <p className="center muted small">{t('loadingLog')}</p>
       </div>
     );
   }
 
+  if (!session) return <SignIn />;
   if (doctorFor) return <Doctor profileId={doctorFor} onExit={() => setDoctorFor(null)} />;
   if (!onboarded) return <Onboarding />;
-  if (!profile) return <Lock onDoctorMode={setDoctorFor} />;
+  if (!activeId || !profile) return <Lock onDoctorMode={setDoctorFor} />;
+  if (locked) return <PinGate onDoctorMode={setDoctorFor} />;
 
   const switchProfile = () => {
     setTab('today');
-    setActive(undefined);
+    window.scrollTo(0, 0);
   };
 
   const tabs: { id: Tab; label: string; icon: JSX.Element }[] = [
@@ -55,20 +78,45 @@ export function App() {
     { id: 'settings', label: t('navSettings'), icon: <IconGear /> },
   ];
 
+  const goSettings = () => {
+    setTab('settings');
+    switchProfile();
+  };
+
   return (
     <div className="app">
       <main className="screen" key={tab}>
+        {!online && (
+          <div className="banner banner-warn">
+            <span className="banner-dot" />
+            <span className="grow">
+              <b>{t('offlineTitle')}</b>
+              <div className="small muted">{t('offlineBody')}</div>
+            </span>
+          </div>
+        )}
+        {online && cloudError && (
+          <div className="banner banner-bad">
+            <span className="banner-dot" />
+            <span className="grow">
+              <b>{t('cloudProblem')}</b>
+              <div className="small muted">{cloudError}</div>
+            </span>
+            <button className="btn btn-sm btn-ghost" disabled={busy} onClick={() => void reload()}>
+              {t('retry')}
+            </button>
+          </div>
+        )}
+
         {tab === 'today' &&
           (profile.role === 'mom' ? (
-            <Today onLog={openLog} onSwitch={switchProfile} />
+            <Today onLog={openLog} onSwitch={goSettings} />
           ) : (
-            <TodaySon onLog={openLog} onSwitch={switchProfile} />
+            <TodaySon onLog={openLog} onSwitch={goSettings} />
           ))}
-        {tab === 'insights' && <Insights onSwitch={switchProfile} />}
-        {tab === 'history' && <History onSwitch={switchProfile} />}
-        {tab === 'settings' && (
-          <Settings onSwitch={switchProfile} onDoctorMode={() => setDoctorFor(profile.id)} />
-        )}
+        {tab === 'insights' && <Insights onSwitch={goSettings} />}
+        {tab === 'history' && <History onSwitch={goSettings} />}
+        {tab === 'settings' && <Settings onDoctorMode={() => setDoctorFor(profile.id)} />}
       </main>
 
       <nav className="tabbar">
@@ -84,7 +132,7 @@ export function App() {
           </button>
         ))}
         <div className="tab-fab">
-          <button className="fab" onClick={() => openLog()} aria-label={t('quickAdd')}>
+          <button className="fab" onClick={() => openLog()} aria-label={t('quickAdd')} disabled={!online}>
             <IconPlus />
           </button>
         </div>

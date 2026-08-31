@@ -3,8 +3,9 @@
 A private calorie and blood-sugar log for two people — a mother managing
 gestational diabetes, and her son eating alongside her.
 
-Everything lives on the phone it was typed into. No account, no server, no
-analytics. It installs to the home screen and works with no internet.
+The log lives in one shared Supabase project, so a reading she takes on her
+phone appears on his. One family login, two profiles. It installs to the home
+screen like an app.
 
 ## What it does
 
@@ -18,11 +19,16 @@ alongside her: it notices when you both logged on the same day.
 that opens *without* the PIN — so the phone can be handed across a desk. Every
 reading is flagged against her targets, and it prints cleanly.
 
-**A PIN that doesn't get in the way.** Optional per profile. Editing needs it;
-Doctor Mode never does.
+**One login, a profile per phone.** Both phones sign into the same family
+account. Each phone picks its profile once and stays on it — the choice is
+remembered until you sign out. Changes appear on the other phone live.
 
-**Photos of meals.** Taken with the camera, downscaled to ~150 KB, stored in
-IndexedDB beside the entry.
+**A PIN that doesn't get in the way.** Optional per profile, asked once per app
+open. Doctor Mode never asks for it.
+
+**Photos of meals.** Taken with the camera and downscaled to ~150 KB, kept on
+the phone that took them. The entry records that a photo exists, so the other
+phone shows a camera marker rather than a broken image.
 
 **Arabic and English**, with a full right-to-left layout and Arabic-Indic
 digits.
@@ -56,6 +62,37 @@ nothing is a population average.
    of the same kind climb in a row, and immediate flags on high or low
    readings.
 
+## Setting up the cloud
+
+1. **Run the schema.** Open the Supabase dashboard → **SQL Editor** → paste all
+   of [`supabase/schema.sql`](supabase/schema.sql) → **Run**. It creates three
+   tables, turns on Row Level Security, and enables realtime. Re-running it is
+   safe.
+
+2. **Create the one shared user.** **Authentication → Users → Add user**, tick
+   *Auto Confirm User*, and give it an email and password you will both use.
+   There is no sign-up screen in the app on purpose — it means nobody else can
+   create an account on your project.
+
+3. **Turn off public sign-ups** (belt and braces). **Authentication → Sign In /
+   Providers → Email**, disable *Allow new users to sign up*.
+
+4. **Add the anon key.** Copy **Settings → API Keys → `anon` `public`** into
+   `SUPABASE_ANON_KEY` in [`src/lib/config.ts`](src/lib/config.ts), then push.
+   That key is public by design: it identifies the project, and Row Level
+   Security is what actually protects the rows. The *database password* is a
+   different credential and must never go in this repo.
+
+### How the data is laid out
+
+Three tables, kept deliberately small. `profiles` holds two rows (`mom`,
+`son`). `entries` holds one row per logged thing, with the type-specific
+fields in a `jsonb` payload rather than thirty mostly-empty columns. `foods`
+is the personal shortcut library. Every row carries `user_id`, defaulted to
+`auth.uid()`, and every policy requires it to match the signed-in user — so
+the anon key on its own reads nothing. Empty fields are stripped client-side
+before writing, and photos never leave the phone.
+
 ## Running it
 
 ```bash
@@ -83,14 +120,18 @@ under the Share menu). After the first load it works fully offline.
 
 ## Backups
 
-The data lives only on that phone — clearing the browser's site data erases it.
-Settings → *Back up to a file* writes everything, photos included, to one JSON
-file. *Restore from a file* reads it back on any phone, which is also how you
-move the log to a new device.
+Supabase is the source of truth and is backed up by them, so a lost phone loses
+nothing but its photos. Settings → *Back up to a file* still exports the whole
+log as JSON if you want a copy of your own.
+
+If a phone logged entries before the cloud existed, Settings offers a one-time
+*Move this phone's older log up*.
 
 ## Notes
 
 - Blood sugar is in **mg/dL** throughout.
+- The app needs internet. With no signal it says so plainly instead of showing
+  an empty day, and logging is disabled until the connection returns.
 - Default targets follow common gestational-diabetes guidance (fasting < 95,
   1 hr < 140, 2 hrs < 120). They are editable in Settings — use whatever the
   doctor gave.
@@ -102,12 +143,17 @@ move the log to a new device.
 src/
   lib/
     algorithm.ts   budget, insights, meal scoring, alerts
-    db.ts          IndexedDB wrapper
-    store.tsx      app state, theme and language wiring
+    cloud.ts       Supabase reads and writes, row <-> app mapping
+    supabase.ts    client, session kept in localStorage
+    config.ts      project URL and anon key
+    db.ts          IndexedDB, now only for meal photos
+    store.tsx      app state, auth, realtime, theme and language wiring
     i18n.ts        the English and Arabic copy deck
     backup.ts      export / import
     photos.ts      capture, downscale, store
   components/      shared UI, charts, the log sheet
-  pages/           today (per profile), insights, history, settings, doctor
+  pages/           sign-in, today (per profile), insights, history, settings, doctor
+supabase/
+  schema.sql       tables, RLS policies, realtime
   styles/          design tokens for the two themes
 ```

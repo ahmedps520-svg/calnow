@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { IconDownload, IconLock, IconSpark, IconUpload } from '../components/Icons';
+import { useEffect, useMemo, useState } from 'react';
+import { IconDownload, IconLock, IconSpark, IconSwap, IconUpload } from '../components/Icons';
 import { Logo } from '../components/Logo';
 import { Confirm, Field, Sheet, Toggle, useToast } from '../components/UI';
 import { computeBudget } from '../lib/algorithm';
-import { downloadBlob, exportBackup, importBackup } from '../lib/backup';
-import { db, storageEstimate } from '../lib/db';
+import { downloadBlob } from '../lib/backup';
+import { storageEstimate } from '../lib/db';
 import { dayKey, num } from '../lib/format';
 import { notificationState, requestNotifications } from '../lib/notify';
 import { useStore } from '../lib/store';
@@ -12,15 +12,16 @@ import type { Lang, Profile } from '../lib/types';
 
 const EMOJIS = ['🌸', '🌿', '💗', '🌺', '⚡', '🔥', '🌊', '🍀', '☀️', '🫐'];
 
-export function Settings({ onSwitch, onDoctorMode }: { onSwitch: () => void; onDoctorMode: () => void }) {
-  const { t, profile, entries, saveProfile, lang, reload } = useStore();
+export function Settings({ onDoctorMode }: { onDoctorMode: () => void }) {
+  const {
+    t, profile, profiles, entries, allEntries, foods, saveProfile, lang,
+    session, signOut, setActive, localCount, uploadLocal,
+  } = useStore();
   const toast = useToast();
-  const fileInput = useRef<HTMLInputElement>(null);
   const [storage, setStorage] = useState<string>();
   const [pinSheet, setPinSheet] = useState(false);
   const [pinDraft, setPinDraft] = useState('');
-  const [erasing, setErasing] = useState(false);
-  const [restoring, setRestoring] = useState<string | null>(null);
+  const [confirmOut, setConfirmOut] = useState(false);
   const [notify, setNotify] = useState(notificationState());
   const [installEvent, setInstallEvent] = useState<Event | null>(null);
 
@@ -70,8 +71,29 @@ export function Settings({ onSwitch, onDoctorMode }: { onSwitch: () => void; onD
           <h1 className="appbar-title display">{t('settings')}</h1>
           <p className="appbar-sub">{profile.name}</p>
         </div>
-        <button className="avatar" onClick={onSwitch} aria-label={t('switchProfile')}>{profile.emoji}</button>
+        <span className="avatar" aria-hidden>{profile.emoji}</span>
       </header>
+
+      {/* ------------------------------ account ------------------------------ */}
+      <p className="section-title">{t('account')}</p>
+      <div className="settings-group">
+        <div className="settings-row">
+          <span className="grow">
+            {t('signedInAs', { a: session?.user?.email ?? '—' })}
+            <div className="tiny faint">{t('loggingAs', { a: profile.name })}</div>
+          </span>
+        </div>
+        <button className="settings-row" onClick={() => setActive(undefined)}>
+          <IconSwap size={18} />
+          <span className="grow">{t('switchTo')}</span>
+          <span className="settings-value">
+            {profiles.filter((p) => p.id !== profile.id).map((p) => p.emoji).join(' ')}
+          </span>
+        </button>
+        <button className="settings-row" onClick={() => setConfirmOut(true)}>
+          <span className="grow" style={{ color: 'var(--bad)' }}>{t('signOut')}</span>
+        </button>
+      </div>
 
       {/* ------------------------------ profile ------------------------------ */}
       <p className="section-title">{t('profileSection')}</p>
@@ -279,8 +301,18 @@ export function Settings({ onSwitch, onDoctorMode }: { onSwitch: () => void; onD
       <div className="settings-group">
         <button
           className="settings-row"
-          onClick={async () => {
-            downloadBlob(await exportBackup(), `calnow-${dayKey(Date.now())}.json`);
+          onClick={() => {
+            const payload = {
+              format: 'calnow-export',
+              exportedAt: new Date().toISOString(),
+              profiles,
+              entries: allEntries,
+              foods,
+            };
+            downloadBlob(
+              new Blob([JSON.stringify(payload)], { type: 'application/json' }),
+              `calnow-${dayKey(Date.now())}.json`,
+            );
             toast(t('done'));
           }}
         >
@@ -290,34 +322,30 @@ export function Settings({ onSwitch, onDoctorMode }: { onSwitch: () => void; onD
             <div className="tiny faint">{t('backupHint')}</div>
           </span>
         </button>
-        <button className="settings-row" onClick={() => fileInput.current?.click()}>
-          <IconUpload size={18} />
-          <span className="grow">
-            {t('restore')}
-            <div className="tiny faint">{t('restoreWarn')}</div>
-          </span>
-        </button>
+        {localCount > 0 && (
+          <button
+            className="settings-row"
+            onClick={async () => {
+              const moved = await uploadLocal();
+              toast(t('moveLocalDone', { a: moved }));
+            }}
+          >
+            <IconUpload size={18} />
+            <span className="grow">
+              {t('moveLocal')}
+              <div className="tiny faint">{t('moveLocalBody', { a: localCount })}</div>
+            </span>
+          </button>
+        )}
         {storage && (
           <div className="settings-row">
-            <span className="grow">{t('storageUsed', { a: storage })}</span>
+            <span className="grow">
+              {t('storageUsed', { a: storage })}
+              <div className="tiny faint">{t('photoStaysLocal')}</div>
+            </span>
           </div>
         )}
-        <button className="settings-row" onClick={() => setErasing(true)}>
-          <span className="grow" style={{ color: 'var(--bad)' }}>{t('eraseAll')}</span>
-        </button>
       </div>
-      <input
-        ref={fileInput}
-        type="file"
-        accept="application/json"
-        hidden
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          setRestoring(await file.text());
-          e.target.value = '';
-        }}
-      />
 
       {/* ------------------------------ about --------------------------------- */}
       <p className="section-title">{t('aboutSection')}</p>
@@ -376,37 +404,15 @@ export function Settings({ onSwitch, onDoctorMode }: { onSwitch: () => void; onD
       </Sheet>
 
       <Confirm
-        open={!!restoring}
-        title={t('restore')}
-        body={t('restoreWarn')}
-        confirmLabel={t('confirm')}
+        open={confirmOut}
+        title={t('signOutQ')}
+        body={t('signOutBody')}
+        confirmLabel={t('signOut')}
         cancelLabel={t('cancel')}
-        danger
-        onCancel={() => setRestoring(null)}
-        onConfirm={async () => {
-          try {
-            const result = await importBackup(restoring!);
-            await reload();
-            toast(`${t('done')} · ${result.entries}`);
-          } catch {
-            toast(t('noMatches'));
-          }
-          setRestoring(null);
-        }}
-      />
-
-      <Confirm
-        open={erasing}
-        title={t('eraseAll')}
-        body={t('eraseWarn')}
-        confirmLabel={t('delete')}
-        cancelLabel={t('cancel')}
-        danger
-        onCancel={() => setErasing(false)}
-        onConfirm={async () => {
-          await db.clearAll();
-          setErasing(false);
-          window.location.reload();
+        onCancel={() => setConfirmOut(false)}
+        onConfirm={() => {
+          setConfirmOut(false);
+          void signOut();
         }}
       />
     </>

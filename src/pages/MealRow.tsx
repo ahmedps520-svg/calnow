@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { IconMeal } from '../components/Icons';
+import { IconCamera, IconMeal } from '../components/Icons';
 import { fmtTime, num } from '../lib/format';
 import { SLOT_KEY } from '../lib/labels';
 import { photoUrl } from '../lib/photos';
@@ -15,10 +15,21 @@ export function MealRow({
 }) {
   const { t, lang } = useStore();
   const [url, setUrl] = useState<string>();
+  /* The photo lives on whichever phone took it, so on the other phone the id
+     resolves to nothing — say so rather than showing a broken frame. */
+  const [elsewhere, setElsewhere] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    if (meal.photoId) photoUrl(meal.photoId).then((u) => alive && setUrl(u));
+    setUrl(undefined);
+    setElsewhere(false);
+    if (meal.photoId) {
+      photoUrl(meal.photoId).then((u) => {
+        if (!alive) return;
+        setUrl(u);
+        setElsewhere(!u);
+      });
+    }
     return () => {
       alive = false;
     };
@@ -31,7 +42,9 @@ export function MealRow({
       {url ? (
         <img className="item-photo" src={url} alt="" loading="lazy" />
       ) : (
-        <span className="item-icon"><IconMeal size={18} /></span>
+        <span className="item-icon" title={elsewhere ? t('photoOtherPhone') : undefined}>
+          {elsewhere ? <IconCamera size={17} /> : <IconMeal size={18} />}
+        </span>
       )}
       <span className="item-main">
         <span className="item-title">{meal.name}</span>

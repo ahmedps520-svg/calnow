@@ -1,84 +1,13 @@
 import { useState } from 'react';
-import { Logo } from '../components/Logo';
 import { IconBack, IconStethoscope } from '../components/Icons';
+import { Logo } from '../components/Logo';
+import { Confirm } from '../components/UI';
 import { useStore } from '../lib/store';
-import type { Profile } from '../lib/types';
 
+/** Pick who is logging on this phone. The choice sticks until you sign out. */
 export function Lock({ onDoctorMode }: { onDoctorMode: (profileId: string) => void }) {
-  const { profiles, setActive, t, lang } = useStore();
-  const [pending, setPending] = useState<Profile | null>(null);
-  const [pin, setPin] = useState('');
-  const [wrong, setWrong] = useState(false);
-
-  const choose = (p: Profile) => {
-    if (p.pin) {
-      setPending(p);
-      setPin('');
-      setWrong(false);
-    } else {
-      setActive(p.id);
-    }
-  };
-
-  const press = (digit: string) => {
-    if (!pending) return;
-    const next = (pin + digit).slice(0, 4);
-    setPin(next);
-    setWrong(false);
-    if (next.length === 4) {
-      if (next === pending.pin) {
-        setActive(pending.id);
-      } else {
-        setWrong(true);
-        window.setTimeout(() => {
-          setPin('');
-          setWrong(false);
-        }, 500);
-      }
-    }
-  };
-
-  if (pending) {
-    return (
-      <div className="picker">
-        <div className="col center" style={{ alignItems: 'center', gap: 10 }}>
-          <div className="avatar avatar-lg">{pending.emoji}</div>
-          <h1 className="display" style={{ fontSize: 22 }}>{pending.name}</h1>
-          <p className="muted small">{t('enterPin')}</p>
-        </div>
-
-        <div className={`pindots${wrong ? ' shake' : ''}`}>
-          {[0, 1, 2, 3].map((i) => (
-            <span key={i} className={`pindot${i < pin.length ? ' on' : ''}`} />
-          ))}
-        </div>
-        {wrong && <p className="center small" style={{ color: 'var(--bad)' }}>{t('wrongPin')}</p>}
-
-        <div className="pinpad">
-          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
-            <button key={d} className="pinkey" onClick={() => press(d)}>
-              {lang === 'ar' ? '٠١٢٣٤٥٦٧٨٩'[Number(d)] : d}
-            </button>
-          ))}
-          <button className="pinkey" style={{ visibility: 'hidden' }} aria-hidden tabIndex={-1} />
-          <button className="pinkey" onClick={() => press('0')}>{lang === 'ar' ? '٠' : '0'}</button>
-          <button className="pinkey" onClick={() => setPin((p) => p.slice(0, -1))} aria-label={t('back')}>
-            <IconBack size={20} />
-          </button>
-        </div>
-
-        <div className="col" style={{ gap: 8 }}>
-          {pending.role === 'mom' && (
-            <button className="btn btn-ghost btn-block" onClick={() => onDoctorMode(pending.id)}>
-              <IconStethoscope size={18} /> {t('openDoctorMode')}
-            </button>
-          )}
-          <button className="btn btn-quiet btn-block" onClick={() => setPending(null)}>{t('back')}</button>
-          <p className="center tiny faint">{t('doctorModeNoPin')}</p>
-        </div>
-      </div>
-    );
-  }
+  const { profiles, setActive, signOut, t } = useStore();
+  const [confirmOut, setConfirmOut] = useState(false);
 
   return (
     <div className="picker">
@@ -94,7 +23,7 @@ export function Lock({ onDoctorMode }: { onDoctorMode: (profileId: string) => vo
           <button
             key={p.id}
             className="picker-card"
-            onClick={() => choose(p)}
+            onClick={() => setActive(p.id)}
             style={{ ['--tint' as string]: p.role === 'mom' ? 'rgba(177,76,99,.16)' : 'rgba(71,213,242,.16)' }}
           >
             <span className="avatar avatar-lg">{p.emoji}</span>
@@ -115,7 +44,87 @@ export function Lock({ onDoctorMode }: { onDoctorMode: (profileId: string) => vo
               <IconStethoscope size={18} /> {t('openDoctorMode')}
             </button>
           ))}
+        <button className="btn btn-quiet btn-block" onClick={() => setConfirmOut(true)}>{t('signOut')}</button>
         <p className="center tiny faint">{t('medicalNote')}</p>
+      </div>
+
+      <Confirm
+        open={confirmOut}
+        title={t('signOutQ')}
+        body={t('signOutBody')}
+        confirmLabel={t('signOut')}
+        cancelLabel={t('cancel')}
+        onCancel={() => setConfirmOut(false)}
+        onConfirm={() => {
+          setConfirmOut(false);
+          void signOut();
+        }}
+      />
+    </div>
+  );
+}
+
+/** Shown once per app open when the remembered profile has a PIN. */
+export function PinGate({ onDoctorMode }: { onDoctorMode: (profileId: string) => void }) {
+  const { profile, unlock, setActive, t, lang } = useStore();
+  const [pin, setPin] = useState('');
+  const [wrong, setWrong] = useState(false);
+
+  if (!profile) return null;
+
+  const press = (digit: string) => {
+    const next = (pin + digit).slice(0, 4);
+    setPin(next);
+    setWrong(false);
+    if (next.length === 4) {
+      if (next === profile.pin) {
+        unlock();
+      } else {
+        setWrong(true);
+        window.setTimeout(() => {
+          setPin('');
+          setWrong(false);
+        }, 500);
+      }
+    }
+  };
+
+  const digit = (d: string) => (lang === 'ar' ? '٠١٢٣٤٥٦٧٨٩'[Number(d)] : d);
+
+  return (
+    <div className="picker">
+      <div className="col center" style={{ alignItems: 'center', gap: 10 }}>
+        <div className="avatar avatar-lg">{profile.emoji}</div>
+        <h1 className="display" style={{ fontSize: 22 }}>{profile.name}</h1>
+        <p className="muted small">{t('lockedHint')}</p>
+      </div>
+
+      <div className={`pindots${wrong ? ' shake' : ''}`}>
+        {[0, 1, 2, 3].map((i) => (
+          <span key={i} className={`pindot${i < pin.length ? ' on' : ''}`} />
+        ))}
+      </div>
+      {wrong && <p className="center small" style={{ color: 'var(--bad)' }}>{t('wrongPin')}</p>}
+
+      <div className="pinpad">
+        {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
+          <button key={d} className="pinkey" onClick={() => press(d)}>{digit(d)}</button>
+        ))}
+        <button className="pinkey" style={{ visibility: 'hidden' }} aria-hidden tabIndex={-1} />
+        <button className="pinkey" onClick={() => press('0')}>{digit('0')}</button>
+        <button className="pinkey" onClick={() => setPin((p) => p.slice(0, -1))} aria-label={t('back')}>
+          <IconBack size={20} />
+        </button>
+      </div>
+
+      <div className="col" style={{ gap: 8 }}>
+        {profile.role === 'mom' && (
+          <button className="btn btn-ghost btn-block" onClick={() => onDoctorMode(profile.id)}>
+            <IconStethoscope size={18} /> {t('openDoctorMode')}
+          </button>
+        )}
+        <button className="btn btn-quiet btn-block" onClick={() => setActive(undefined)}>{t('switchTo')}</button>
+        <p className="center tiny faint">{t('doctorModeNoPin')}</p>
       </div>
     </div>
   );

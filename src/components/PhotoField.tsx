@@ -63,6 +63,7 @@ export function PhotoField({
           <IconCamera size={26} />
           <span>{busy ? '…' : t('addPhoto')}</span>
           <span className="tiny faint">{t('photoHint')}</span>
+          <span className="tiny faint">{t('photoStaysLocal')}</span>
         </button>
       )}
     </div>

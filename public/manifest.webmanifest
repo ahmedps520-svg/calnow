@@ -1,7 +1,7 @@
 {
   "name": "Calnow — Family Health Log",
   "short_name": "Calnow",
-  "description": "A private, offline calorie and blood-sugar tracker for the family.",
+  "description": "A private calorie and blood-sugar log shared between two phones.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -88,6 +88,8 @@ export interface Profile {
   targets: Targets;
   /** soft lock — not encryption */
   pin?: string;
+  /** household-level: set once the first-run setup has been completed */
+  onboarded?: boolean;
   reminders: Reminders;
   createdAt: number;
 }
