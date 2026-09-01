@@ -27,30 +27,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      # A Pages site left on "Deploy from a branch" keeps running GitHub's own
-      # publisher on every push. That publisher serves the repo root -- the
-      # un-built Vite source -- and whichever publisher finishes last wins, so
-      # the site flips between the real app and a blank page. Pin the site to
-      # workflow builds so the branch publisher stops running at all.
-      # enablement:true on configure-pages only covers creating a missing site,
-      # not converting an existing one, hence the explicit call.
-      - name: Publish from this workflow, not from the branch
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          code=$(curl -sS -o /tmp/pages.json -w '%{http_code}' -X PUT \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${{ github.repository }}/pages" \
-            -d '{"build_type":"workflow"}') || true
-          echo "set build_type=workflow -> HTTP $code"
-          cat /tmp/pages.json || true
-          if [ "$code" != "204" ] && [ "$code" != "200" ]; then
-            echo "::warning::Could not set the Pages build type automatically."
-            echo "::warning::Set Settings > Pages > Source to GitHub Actions by hand."
-          fi
-
+      # NOTE: this repo's Pages site must have Source = "GitHub Actions"
+      # (Settings > Pages > Build and deployment). While it is set to "Deploy
+      # from a branch", GitHub runs its own publisher on every push, which
+      # serves the repo root -- the un-built Vite source -- and whichever
+      # publisher finishes last wins, so the site flips between the real app
+      # and a blank page. That setting can only be changed by a repo admin in
+      # the UI: GITHUB_TOKEN gets 403 "Resource not accessible by integration"
+      # on the Pages API, and configure-pages' enablement only covers creating
+      # a site that does not exist yet.
       - uses: actions/configure-pages@v5
         with:
           enablement: true

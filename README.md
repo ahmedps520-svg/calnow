@@ -104,17 +104,21 @@ npm run icons      # regenerate PWA icons from the logo source
 
 ## Deploying
 
-Every push to `main` or the active working branch builds and publishes via
-`.github/workflows/deploy.yml`. Nothing to configure by hand: the workflow's
-`configure-pages` step runs with `enablement: true`, which sets the Pages site's
-build type to *GitHub Actions* itself.
+**Set this once, by hand:** Settings → Pages → Build and deployment →
+**Source: GitHub Actions**.
 
-That step matters more than it looks. While a site is left on *Deploy from a
-branch*, GitHub runs its own publisher alongside this workflow on every push,
-and that publisher serves the **repo root** — the un-built Vite source, whose
-`index.html` points at `/src/main.tsx`. Whichever of the two finishes last
-wins, so the site flickers between the real app and a blank page. Setting the
-build type to workflow stops the branch publisher from running at all.
+It is the one thing that cannot be automated. While the site is left on
+*Deploy from a branch*, GitHub runs its own publisher alongside this workflow
+on every push, and that publisher serves the **repo root** — the un-built Vite
+source, whose `index.html` points at `/src/main.tsx`. Whichever of the two
+finishes last wins, so the site flips between the real app and a blank page.
+Changing the build type needs repo-admin rights: the workflow's `GITHUB_TOKEN`
+gets `403 Resource not accessible by integration` from the Pages API, and
+`configure-pages`' `enablement` input only covers creating a site that does
+not exist yet.
+
+After that, every push to `main` or the active working branch builds and
+publishes via `.github/workflows/deploy.yml`.
 
 As a backstop, the source `index.html` detects being served un-built and prints
 what is wrong instead of rendering nothing.
