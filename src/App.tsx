@@ -33,7 +33,8 @@ function Setup() {
 
 export function App() {
   const {
-    ready, configured, session, profile, activeId, locked, onboarded, online, cloudError, busy, reload, t,
+    ready, configured, session, profile, profiles, activeId, locked, onboarded, online,
+    cloudError, busy, reload, signOut, t,
   } = useStore();
   const [tab, setTab] = useState<Tab>('today');
   const [logOpen, setLogOpen] = useState(false);
@@ -61,6 +62,28 @@ export function App() {
   }
 
   if (!session) return <SignIn />;
+
+  /* Signed in but the tables aren't reachable — usually schema.sql hasn't been
+     run yet. Say that plainly instead of dropping into a setup flow whose
+     saves would silently fail. */
+  if (cloudError && !profiles.length) {
+    return (
+      <div className="picker">
+        <div className="col" style={{ alignItems: 'center', gap: 12 }}>
+          <Logo size={54} />
+          <h1 className="display" style={{ fontSize: 24 }}>{t('cloudProblem')}</h1>
+          <p className="muted small center">{cloudError}</p>
+        </div>
+        <div className="col">
+          <button className="btn btn-primary btn-block" disabled={busy} onClick={() => void reload()}>
+            {t('retry')}
+          </button>
+          <button className="btn btn-quiet btn-block" onClick={() => void signOut()}>{t('signOut')}</button>
+        </div>
+      </div>
+    );
+  }
+
   if (doctorFor) return <Doctor profileId={doctorFor} onExit={() => setDoctorFor(null)} />;
   if (!onboarded) return <Onboarding />;
   if (!activeId || !profile) return <Lock onDoctorMode={setDoctorFor} />;
