@@ -104,13 +104,20 @@ npm run icons      # regenerate PWA icons from the logo source
 
 ## Deploying
 
-**Set the Pages source to GitHub Actions once**, under
-**Settings → Pages → Build and deployment → Source**. If it is left on
-*Deploy from a branch*, GitHub serves the repo root — which is the un-built
-Vite source — and the page loads blank.
+Every push to `main` or the active working branch builds and publishes via
+`.github/workflows/deploy.yml`. Nothing to configure by hand: the workflow's
+`configure-pages` step runs with `enablement: true`, which sets the Pages site's
+build type to *GitHub Actions* itself.
 
-After that, every push to `main` or the active working branch builds and
-publishes via `.github/workflows/deploy.yml`.
+That step matters more than it looks. While a site is left on *Deploy from a
+branch*, GitHub runs its own publisher alongside this workflow on every push,
+and that publisher serves the **repo root** — the un-built Vite source, whose
+`index.html` points at `/src/main.tsx`. Whichever of the two finishes last
+wins, so the site flickers between the real app and a blank page. Setting the
+build type to workflow stops the branch publisher from running at all.
+
+As a backstop, the source `index.html` detects being served un-built and prints
+what is wrong instead of rendering nothing.
 
 The build assumes the app is served from `/calnow/`. For a root domain
 (Netlify, Vercel, a custom domain) build with `BASE_PATH=/ npm run build`.
