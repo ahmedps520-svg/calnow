@@ -27,7 +27,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # enablement:true switches the Pages site to build_type "workflow".
+      # Without it, a site left on "Deploy from a branch" keeps running
+      # GitHub's own publisher, which serves the repo root (the un-built
+      # source) and races this job for the last word.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
