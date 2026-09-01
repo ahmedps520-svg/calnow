@@ -18,5 +18,22 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      /* If this file is ever served as-is instead of the built output — which is
+         what happens when GitHub Pages publishes the repo root — the module
+         above 404s and the page stays blank. Say so rather than showing white. */
+      setTimeout(function () {
+        var root = document.getElementById('root');
+        if (root && root.childElementCount === 0) {
+          root.innerHTML =
+            '<div style="font:15px/1.5 -apple-system,system-ui,sans-serif;color:#6d5f57;' +
+            'max-width:34rem;margin:18vh auto;padding:0 24px;text-align:center">' +
+            '<div style="font-size:20px;color:#2b2320;margin-bottom:10px">Calnow could not start</div>' +
+            'This page was served straight from the repository instead of the built app. ' +
+            'In GitHub \u2192 Settings \u2192 Pages, set <b>Source</b> to <b>GitHub Actions</b>, ' +
+            'then reload.</div>';
+        }
+      }, 4000);
+    </script>
   </body>
 </html>

@@ -13,6 +13,8 @@
 export const SUPABASE_URL =
   import.meta.env.VITE_SUPABASE_URL || 'https://jhkctlmrcmjohkrisyjc.supabase.co';
 
-export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+export const SUPABASE_ANON_KEY =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impoa2N0bG1yY21qb2hrcmlzeWpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxOTMxOTEsImV4cCI6MjEwMzc2OTE5MX0.uMCoVOO5pxKsn77TTGQUZ88X6WVIZJgoE2Rx1g0_M4E';
 
 export const isConfigured = SUPABASE_ANON_KEY.length > 40;
